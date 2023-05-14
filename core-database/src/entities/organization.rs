@@ -6,6 +6,7 @@ use crate::traits::{DatabaseError, EntityRepository};
 #[derive(Debug)]
 pub enum OrganizationBy {
     Id(Uuid),
+    Name(String),
 }
 
 #[derive(Debug)]
@@ -62,6 +63,13 @@ impl
             .fetch_one(db)
             .await
             .map_err(DatabaseError::from),
+            OrganizationBy::Name(name) => sqlx::query_as::<_, OrganizationDAO>(
+                "SELECT id, name, active FROM organizations WHERE name = $1 LIMIT 1",
+            )
+            .bind(name)
+            .fetch_one(db)
+            .await
+            .map_err(DatabaseError::from),
         }
     }
 
@@ -100,7 +108,8 @@ impl
                     .fetch_one(db)
                     .await
                     .map_err(DatabaseError::from)
-            }
+            },
+            OrganizationBy::Name(_) => Err(DatabaseError::NotImplemented),
         }
     }
 
@@ -116,6 +125,7 @@ impl
             .fetch_one(db)
             .await
             .map_err(DatabaseError::from),
+            OrganizationBy::Name(_) => Err(DatabaseError::NotImplemented),
         }
     }
 }

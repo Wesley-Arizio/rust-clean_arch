@@ -3,7 +3,7 @@ use sqlx::{Pool, Sqlite, SqlitePool};
 
 #[derive(Debug)]
 pub struct DatabaseRepository {
-    connection: Pool<Sqlite>,
+    pub connection: Pool<Sqlite>,
 }
 
 impl DatabaseRepository {

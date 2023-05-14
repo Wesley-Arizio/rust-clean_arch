@@ -4,5 +4,6 @@ members = [
     "api-rest",
     "authentication",
     "notification",
-    "core-database"
+    "core-database",
+    "cli"
 ]
