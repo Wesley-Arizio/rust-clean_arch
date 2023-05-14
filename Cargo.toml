@@ -3,5 +3,6 @@
 members = [
     "api-rest",
     "authentication",
-    "notification"
+    "notification",
+    "core-database"
 ]
