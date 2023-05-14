@@ -42,4 +42,12 @@ pub trait EntityRepository<
 >
 {
     async fn get(db: &Pool<DB>, key: QueryOne) -> Result<Entity, DatabaseError>;
+    async fn get_all(db: &Pool<DB>, key: QueryMany) -> Result<Vec<Entity>, DatabaseError>;
+    async fn insert(db: &Pool<DB>, input: CreateInput) -> Result<Entity, DatabaseError>;
+    async fn update(
+        db: &Pool<DB>,
+        key: QueryOne,
+        input: UpdateInput,
+    ) -> Result<Entity, DatabaseError>;
+    async fn delete(db: &Pool<DB>, key: QueryOne) -> Result<Entity, DatabaseError>;
 }
