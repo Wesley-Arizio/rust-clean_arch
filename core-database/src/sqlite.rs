@@ -20,7 +20,7 @@ impl DatabaseRepository {
         let query = "
             CREATE TABLE organizations (
                 id UUID NOT NULL PRIMARY KEY,
-                name TEXT NOT NULL,
+                name TEXT NOT NULL UNIQUE,
                 active BOOLEAN NOT NULL DEFAULT true
             );
 
