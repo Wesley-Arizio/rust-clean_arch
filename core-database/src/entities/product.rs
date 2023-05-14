@@ -1,6 +1,6 @@
+use chrono::{DateTime, Utc};
 use num_bigint::BigUint;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ProductDAO {
@@ -11,7 +11,7 @@ pub struct ProductDAO {
     pub amount: u32,
     pub price: BigUint,
     pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(sqlx::FromRow, Debug, PartialEq, Eq, Clone)]
@@ -23,7 +23,7 @@ pub struct SqliteProductDAO {
     pub amount: i32,
     pub price: Vec<u8>,
     pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>
+    pub updated_at: DateTime<Utc>,
 }
 
 impl From<ProductDAO> for SqliteProductDAO {
@@ -36,7 +36,7 @@ impl From<ProductDAO> for SqliteProductDAO {
             price: value.price.to_bytes_le(),
             description: value.description,
             created_at: value.created_at,
-            updated_at: value.updated_at
+            updated_at: value.updated_at,
         }
     }
 }
@@ -51,7 +51,7 @@ impl From<SqliteProductDAO> for ProductDAO {
             amount: value.amount.unsigned_abs(),
             price: BigUint::from_bytes_le(&value.price),
             created_at: value.created_at,
-            updated_at: value.updated_at
+            updated_at: value.updated_at,
         }
     }
 }
