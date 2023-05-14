@@ -20,16 +20,3 @@ impl Repository for DatabaseRepository {
             .map_err(DatabaseError::from)
     }
 }
-
-
-
-#[tokio::main]
-async fn main() -> Result<(), String> {
-    let db = DatabaseRepository::new()
-        .await
-        .map_err(|e| format!("{:#?}", e))?;
-
-    let result  = db.create_organization("Cryptize".to_string()).await.map_err(|e| format!("error: {:#?}", e))?;
-    println!("Result: {:#?}", result);
-    Ok(())
-}
