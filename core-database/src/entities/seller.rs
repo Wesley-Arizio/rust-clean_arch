@@ -7,8 +7,6 @@ pub struct SellerDAO {
     pub organization_id: Uuid,
     pub email: String,
     pub password: String,
-    pub created_at: DateTime<Utc>,
     pub active: bool,
-    // TODO - Change it to BigUint
-    pub total_commission: String
+    pub created_at: DateTime<Utc>,
 }

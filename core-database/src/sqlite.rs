@@ -41,7 +41,6 @@ impl DatabaseRepository {
                 password TEXT NOT NULL,
                 active BOOLEAN NOT NULL DEFAULT true,
                 created_at INTEGER NO NULL DEFAULT (unixepoch('now')),
-                updated_at INTEGER NO NULL DEFAULT (unixepoch('now')),
                 FOREIGN KEY (organization_id) REFERENCES organizations(id)
             );
 
@@ -49,9 +48,9 @@ impl DatabaseRepository {
                 id UUID NOT NULL PRIMARY KEY,
                 organization_id UUID NOT NULL,
                 name TEXT NOT NULL,
+                description TEXT NOT NULL,
                 amount INTEGER NOT NULL,
                 price BLOB NOT NULL,
-                password TEXT NOT NULL,
                 created_at INTEGER NO NULL DEFAULT (unixepoch('now')),
                 updated_at INTEGER NO NULL DEFAULT (unixepoch('now')),
                 FOREIGN KEY (organization_id) REFERENCES organizations(id)
