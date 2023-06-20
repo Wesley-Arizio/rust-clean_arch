@@ -49,6 +49,18 @@ impl EntityRepository<Sqlite, AdminDAO, AdminDAO, AdminDAO, AdminBy, AdminBy> fo
         }
     }
 
+    async fn try_get(db: &Pool<Sqlite>, key: AdminBy) -> Result<Option<AdminDAO>, DatabaseError> {
+        match key {
+            AdminBy::Id(uuid) => sqlx::query_as::<_, AdminDAO>(
+                "SELECT id, organization_id, email, password, is_default FROM admins WHERE id = $1 LIMIT 1",
+            )
+            .bind(uuid)
+            .fetch_optional(db)
+            .await
+            .map_err(DatabaseError::from),
+        }
+    }
+
     async fn get_all(_db: &Pool<Sqlite>, _key: AdminBy) -> Result<Vec<AdminDAO>, DatabaseError> {
         Err(DatabaseError::NotImplemented)
     }

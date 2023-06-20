@@ -73,6 +73,28 @@ impl
         }
     }
 
+    async fn try_get(
+        db: &Pool<Sqlite>,
+        key: OrganizationBy,
+    ) -> Result<Option<OrganizationDAO>, DatabaseError> {
+        match key {
+            OrganizationBy::Id(uuid) => sqlx::query_as::<_, OrganizationDAO>(
+                "SELECT id, name, active FROM organizations WHERE id = $1 LIMIT 1",
+            )
+            .bind(uuid)
+            .fetch_optional(db)
+            .await
+            .map_err(DatabaseError::from),
+            OrganizationBy::Name(name) => sqlx::query_as::<_, OrganizationDAO>(
+                "SELECT id, name, active FROM organizations WHERE name = $1 LIMIT 1",
+            )
+            .bind(name)
+            .fetch_optional(db)
+            .await
+            .map_err(DatabaseError::from),
+        }
+    }
+
     async fn get_all(
         db: &Pool<Sqlite>,
         key: OrganizationsWhere,

@@ -51,6 +51,18 @@ impl EntityRepository<Sqlite, SellerDAO, SellerDAO, SellerDAO, SellerBy, SellerB
         }
     }
 
+    async fn try_get(db: &Pool<Sqlite>, key: SellerBy) -> Result<Option<SellerDAO>, DatabaseError> {
+        match key {
+            SellerBy::Id(uuid) => sqlx::query_as::<_, SellerDAO>(
+                "SELECT id, organization_id, email, password, active, created_at FROM sellers WHERE id = $1 LIMIT 1",
+            )
+            .bind(uuid)
+            .fetch_optional(db)
+            .await
+            .map_err(DatabaseError::from),
+        }
+    }
+
     async fn get_all(_db: &Pool<Sqlite>, _key: SellerBy) -> Result<Vec<SellerDAO>, DatabaseError> {
         Err(DatabaseError::NotImplemented)
     }

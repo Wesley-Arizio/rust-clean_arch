@@ -101,6 +101,22 @@ impl EntityRepository<Sqlite, ProductDAO, ProductDAO, ProductDAO, ProductBy, Pro
         }
     }
 
+    async fn try_get(
+        db: &Pool<Sqlite>,
+        key: ProductBy,
+    ) -> Result<Option<ProductDAO>, DatabaseError> {
+        match key {
+            ProductBy::Id(uuid) => sqlx::query_as::<_, SqliteProductDAO>(
+                "SELECT id, organization_id, name, description, amount, price, created_at, updated_at FROM products WHERE id = $1 LIMIT 1",
+            )
+            .bind(uuid)
+            .fetch_optional(db)
+            .await
+            .map(|v| v.map(ProductDAO::from))
+            .map_err(DatabaseError::from),
+        }
+    }
+
     async fn get_all(
         _db: &Pool<Sqlite>,
         _key: ProductBy,
