@@ -12,6 +12,7 @@ pub enum DatabaseError {
     NotImplemented,
     Unknown(String),
     DatabaseInconsistence(String),
+    MigrationFailed(String),
 }
 
 impl From<SqlxError> for DatabaseError {

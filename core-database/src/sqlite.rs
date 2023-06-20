@@ -1,76 +1,42 @@
 use crate::traits::DatabaseError;
-use sqlx::{Pool, Sqlite, SqlitePool};
+use sqlx::{
+    migrate::{Migrate, Migrator},
+    Pool, Sqlite, SqlitePool,
+};
 
 #[derive(Debug)]
 pub struct DatabaseRepository {
     pub connection: Pool<Sqlite>,
 }
 
+static MIGRATOR: Migrator = sqlx::migrate!("./sqlite-migrations");
+
 impl DatabaseRepository {
     pub async fn new() -> Result<Self, DatabaseError> {
         let connection = SqlitePool::connect("sqlite::memory:")
             .await
             .map_err(DatabaseError::from)?;
-        let repository = Self { connection };
-        repository.migrate().await?;
+
+        DatabaseRepository::migrate(&connection).await?;
+        let repository: DatabaseRepository = Self { connection };
         Ok(repository)
     }
 
-    async fn migrate(&self) -> Result<sqlx::sqlite::SqliteQueryResult, DatabaseError> {
-        let query = "
-            CREATE TABLE organizations (
-                id UUID NOT NULL PRIMARY KEY,
-                name TEXT NOT NULL UNIQUE,
-                active BOOLEAN NOT NULL DEFAULT true
-            );
-
-            CREATE TABLE admins (
-                id UUID NOT NULL PRIMARY KEY,
-                organization_id UUID NOT NULL,
-                email TEXT NOT NULL UNIQUE,
-                password TEXT NOT NULL,
-                is_default BOOLEAN NOT NULL DEFAULT false,
-                FOREIGN KEY (organization_id) REFERENCES organizations(id)
-            );
-
-            CREATE TABLE sellers (
-                id UUID NOT NULL PRIMARY KEY,
-                organization_id UUID NOT NULL,
-                email TEXT NOT NULL UNIQUE,
-                password TEXT NOT NULL,
-                active BOOLEAN NOT NULL DEFAULT true,
-                created_at INTEGER NO NULL DEFAULT (unixepoch('now')),
-                FOREIGN KEY (organization_id) REFERENCES organizations(id)
-            );
-
-            CREATE TABLE products (
-                id UUID NOT NULL PRIMARY KEY,
-                organization_id UUID NOT NULL,
-                name TEXT NOT NULL,
-                description TEXT NOT NULL,
-                amount INTEGER NOT NULL,
-                price BLOB NOT NULL,
-                created_at INTEGER NO NULL DEFAULT (unixepoch('now')),
-                updated_at INTEGER NO NULL DEFAULT (unixepoch('now')),
-                FOREIGN KEY (organization_id) REFERENCES organizations(id)
-            );
-
-            CREATE TABLE sales (
-                id UUID NOT NULL PRIMARY KEY,
-                product_id UUID NOT NULL,
-                seller_id UUID NOT NULL,
-                amount INTEGER NOT NULL,
-                total_price BLOB NOT NULL,
-                created_at INTEGER NO NULL DEFAULT (unixepoch('now')),
-                updated_at INTEGER NO NULL DEFAULT (unixepoch('now')),
-                FOREIGN KEY (product_id) REFERENCES products(id),
-                FOREIGN KEY (seller_id) REFERENCES sellers(id)
-            );
-        ";
-        let result: sqlx::sqlite::SqliteQueryResult = sqlx::query(&query)
-            .execute(&self.connection)
+    async fn migrate(pool: &Pool<Sqlite>) -> Result<(), DatabaseError> {
+        let mut conn = pool.acquire().await.map_err(DatabaseError::from)?;
+        conn.ensure_migrations_table()
             .await
-            .map_err(DatabaseError::from)?;
-        Ok(result)
+            .map_err(|e| DatabaseError::MigrationFailed(e.to_string()))?;
+        for migration in MIGRATOR.iter() {
+            if migration.migration_type.is_down_migration() {
+                // Skipping down migrations
+                continue;
+            }
+            conn.apply(migration)
+                .await
+                .map_err(|e| DatabaseError::MigrationFailed(e.to_string()))?;
+        }
+
+        Ok(())
     }
 }
