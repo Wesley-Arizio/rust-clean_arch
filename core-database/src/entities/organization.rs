@@ -25,6 +25,17 @@ pub struct OrganizationDAO {
     pub active: bool,
 }
 
+#[derive(sqlx::FromRow, Debug, PartialEq, Eq, Clone)]
+pub struct NewOrganizationDAO {
+    pub name: String,
+}
+
+#[derive(sqlx::FromRow, Debug, PartialEq, Eq, Clone)]
+pub struct UpdateOrganizationDAO {
+    pub name: String,
+    pub active: bool,
+}
+
 #[derive(Debug)]
 pub struct OrganizationRepository;
 
@@ -33,15 +44,15 @@ impl
     EntityRepository<
         Sqlite,
         OrganizationDAO,
-        OrganizationDAO,
-        OrganizationDAO,
+        NewOrganizationDAO,
+        UpdateOrganizationDAO,
         OrganizationBy,
         OrganizationsWhere,
     > for OrganizationRepository
 {
     async fn insert(
         db: &Pool<Sqlite>,
-        input: OrganizationDAO,
+        input: NewOrganizationDAO,
     ) -> Result<OrganizationDAO, DatabaseError> {
         let uuid = Uuid::new_v4();
         sqlx::query_as::<_, OrganizationDAO>(
@@ -119,7 +130,7 @@ impl
     async fn update(
         db: &Pool<Sqlite>,
         key: OrganizationBy,
-        input: OrganizationDAO,
+        input: UpdateOrganizationDAO,
     ) -> Result<OrganizationDAO, DatabaseError> {
         match key {
             OrganizationBy::Id(uuid) => {
@@ -149,5 +160,104 @@ impl
             .map_err(DatabaseError::from),
             OrganizationBy::Name(_) => Err(DatabaseError::NotImplemented),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sqlite::DatabaseRepository;
+
+    #[tokio::test]
+    async fn queries() {
+        let db = DatabaseRepository::new()
+            .await
+            .expect("Could not initialize db");
+
+        let organization = OrganizationRepository::insert(
+            &db.connection,
+            NewOrganizationDAO {
+                name: "dev3".to_string(),
+            },
+        )
+        .await
+        .expect("Could not create organization");
+
+        assert!(organization.active);
+        assert_eq!(organization.name, "dev3");
+
+        let organization =
+            OrganizationRepository::get(&db.connection, OrganizationBy::Id(organization.id))
+                .await
+                .expect("Could not find organization");
+
+        assert!(organization.active);
+        assert_eq!(organization.name, "dev3");
+
+        let organization =
+            OrganizationRepository::get(&db.connection, OrganizationBy::Name(organization.name))
+                .await
+                .expect("Could not find organization");
+
+        assert!(organization.active);
+        assert_eq!(organization.name, "dev3");
+
+        let maybe_organization =
+            OrganizationRepository::try_get(&db.connection, OrganizationBy::Id(organization.id))
+                .await
+                .expect("Could not find organization");
+
+        assert!(maybe_organization.is_some());
+
+        let maybe_organization =
+            OrganizationRepository::try_get(&db.connection, OrganizationBy::Id(Uuid::default()))
+                .await
+                .expect("Could not find organization");
+
+        assert!(maybe_organization.is_none());
+
+        let updated = OrganizationRepository::update(
+            &db.connection,
+            OrganizationBy::Id(organization.id),
+            UpdateOrganizationDAO {
+                name: "dev4".to_string(),
+                active: false,
+            },
+        )
+        .await
+        .expect("Could not update organization by id");
+
+        assert_eq!(updated.name, "dev4");
+        assert_ne!(updated.name, organization.name);
+        assert!(!updated.active);
+
+        let updated = OrganizationRepository::update(
+            &db.connection,
+            OrganizationBy::Name(updated.name),
+            UpdateOrganizationDAO {
+                name: "dev45".to_string(),
+                active: true,
+            },
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(updated, DatabaseError::NotImplemented);
+
+        let _ = OrganizationRepository::delete(&db.connection, OrganizationBy::Id(organization.id))
+            .await
+            .expect("Could not delete organization by id");
+
+        let maybe_organization =
+            OrganizationRepository::try_get(&db.connection, OrganizationBy::Id(organization.id))
+                .await
+                .expect("Could not find organization");
+
+        assert!(maybe_organization.is_none());
+
+        let deleted =
+            OrganizationRepository::delete(&db.connection, OrganizationBy::Name(organization.name))
+                .await
+                .unwrap_err();
+        assert_eq!(deleted, DatabaseError::NotImplemented);
     }
 }

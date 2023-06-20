@@ -21,6 +21,23 @@ pub struct ProductDAO {
     pub updated_at: DateTime<Utc>,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct NewProductDAO {
+    pub organization_id: Uuid,
+    pub name: String,
+    pub description: String,
+    pub amount: u32,
+    pub price: BigUint,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct UpdateProductDAO {
+    pub name: String,
+    pub description: String,
+    pub amount: u32,
+    pub price: BigUint,
+}
+
 #[derive(sqlx::FromRow, Debug, PartialEq, Eq, Clone)]
 pub struct SqliteProductDAO {
     pub id: Uuid,
@@ -48,6 +65,36 @@ impl From<ProductDAO> for SqliteProductDAO {
     }
 }
 
+impl From<NewProductDAO> for SqliteProductDAO {
+    fn from(value: NewProductDAO) -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            organization_id: value.organization_id,
+            name: value.name,
+            amount: i32::try_from(value.amount).unwrap_or_default(),
+            price: value.price.to_bytes_le(),
+            description: value.description,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+}
+
+impl From<UpdateProductDAO> for SqliteProductDAO {
+    fn from(value: UpdateProductDAO) -> Self {
+        Self {
+            id: Uuid::default(),
+            organization_id: Uuid::default(),
+            name: value.name,
+            amount: i32::try_from(value.amount).unwrap_or_default(),
+            price: value.price.to_bytes_le(),
+            description: value.description,
+            created_at: DateTime::default(),
+            updated_at: DateTime::default(),
+        }
+    }
+}
+
 impl From<SqliteProductDAO> for ProductDAO {
     fn from(value: SqliteProductDAO) -> Self {
         Self {
@@ -67,10 +114,10 @@ impl From<SqliteProductDAO> for ProductDAO {
 pub struct ProductRepository;
 
 #[async_trait::async_trait]
-impl EntityRepository<Sqlite, ProductDAO, ProductDAO, ProductDAO, ProductBy, ProductBy>
+impl EntityRepository<Sqlite, ProductDAO, NewProductDAO, UpdateProductDAO, ProductBy, ProductBy>
     for ProductRepository
 {
-    async fn insert(db: &Pool<Sqlite>, input: ProductDAO) -> Result<ProductDAO, DatabaseError> {
+    async fn insert(db: &Pool<Sqlite>, input: NewProductDAO) -> Result<ProductDAO, DatabaseError> {
         let uuid = Uuid::new_v4();
         let input = SqliteProductDAO::from(input);
         sqlx::query_as::<_, SqliteProductDAO>(
@@ -127,7 +174,7 @@ impl EntityRepository<Sqlite, ProductDAO, ProductDAO, ProductDAO, ProductBy, Pro
     async fn update(
         db: &Pool<Sqlite>,
         key: ProductBy,
-        input: ProductDAO,
+        input: UpdateProductDAO,
     ) -> Result<ProductDAO, DatabaseError> {
         let input = SqliteProductDAO::from(input);
         match key {
@@ -157,5 +204,103 @@ impl EntityRepository<Sqlite, ProductDAO, ProductDAO, ProductDAO, ProductBy, Pro
             .map(ProductDAO::from)
             .map_err(DatabaseError::from),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        entities::organization::{NewOrganizationDAO, OrganizationDAO, OrganizationRepository},
+        sqlite::DatabaseRepository,
+    };
+
+    use super::*;
+
+    async fn create_organization(pool: &Pool<Sqlite>, name: &str) -> OrganizationDAO {
+        OrganizationRepository::insert(
+            pool,
+            NewOrganizationDAO {
+                name: name.to_string(),
+            },
+        )
+        .await
+        .expect("Could not create organization")
+    }
+
+    #[tokio::test]
+    async fn queries() {
+        let db = DatabaseRepository::new()
+            .await
+            .expect("Could not initialize db");
+
+        let organization = create_organization(&db.connection, "test").await;
+
+        let product = ProductRepository::insert(
+            &db.connection,
+            NewProductDAO {
+                organization_id: organization.id,
+                name: "Iphone".to_string(),
+                description: "smartphone".to_string(),
+                amount: 10,
+                price: BigUint::from(5000u32),
+            },
+        )
+        .await
+        .expect("Could not create a new product");
+
+        assert_eq!(product.name, "Iphone");
+        assert_eq!(product.description, "smartphone");
+        assert_eq!(product.amount, 10);
+        assert_eq!(product.price, BigUint::from(5000u32));
+
+        let product = ProductRepository::get(&db.connection, ProductBy::Id(product.id))
+            .await
+            .expect("Could not find a new product");
+
+        assert_eq!(product.name, "Iphone");
+        assert_eq!(product.description, "smartphone");
+        assert_eq!(product.amount, 10);
+        assert_eq!(product.price, BigUint::from(5000u32));
+
+        let maybe_product =
+            ProductRepository::try_get(&db.connection, ProductBy::Id(Uuid::default()))
+                .await
+                .expect("Could not find a new product");
+
+        assert!(maybe_product.is_none());
+
+        let maybe_product = ProductRepository::try_get(&db.connection, ProductBy::Id(product.id))
+            .await
+            .expect("Could not find a new product");
+
+        assert!(maybe_product.is_some());
+
+        let updated_product = ProductRepository::update(
+            &db.connection,
+            ProductBy::Id(product.id),
+            UpdateProductDAO {
+                name: "Iphone XR".to_string(),
+                description: "smartphone premium".to_string(),
+                amount: 11,
+                price: BigUint::from(4000u32),
+            },
+        )
+        .await
+        .expect("Could not update a product");
+
+        assert!(product.name != updated_product.name);
+        assert!(product.description != updated_product.description);
+        assert!(product.amount != updated_product.amount);
+        assert!(product.price != updated_product.price);
+
+        let deleted = ProductRepository::delete(&db.connection, ProductBy::Id(product.id))
+            .await
+            .expect("Could not delete a product");
+
+        let maybe_product = ProductRepository::try_get(&db.connection, ProductBy::Id(deleted.id))
+            .await
+            .expect("Could not find a product");
+
+        assert!(maybe_product.is_none());
     }
 }

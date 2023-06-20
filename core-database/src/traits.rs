@@ -1,6 +1,6 @@
 use sqlx::{Database, Error as SqlxError, Pool};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum DatabaseError {
     NotFound(String),
     CommunicationError,
